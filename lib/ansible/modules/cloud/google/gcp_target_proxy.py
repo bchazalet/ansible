@@ -114,6 +114,16 @@ def _build_target_proxy_dict(params, project_id=None):
     if 'urlMap' in gcp_dict:
         gcp_dict['urlMap'] = '%s/global/urlMaps/%s' % (url,
                                                        gcp_dict['urlMap'])
+
+    # only one ssl_certificate is currently supported
+    if 'sslCertificates' in gcp_dict:
+        ssl_certificates = []
+        for ssl_certificate in gcp_dict['sslCertificates']:
+            ssl_certificate = '%s/global/sslCertificates/%s' % (url,
+                                                            ssl_certificate)
+            ssl_certificates.append(ssl_certificate)
+        gcp_dict['sslCertificates'] = ssl_certificates
+
     return gcp_dict
 
 
@@ -233,6 +243,29 @@ def delete_target_http_proxy(client, name, project_id):
     except:
         raise
 
+def delete_target_https_proxy(client, name, project_id):
+    """
+    Delete a Target_Proxy.
+
+    :param client: An initialized GCE Compute Discovery resource.
+    :type client:  :class: `googleapiclient.discovery.Resource`
+
+    :param name: Name of the Target Proxy.
+    :type name:  ``str``
+
+    :param project_id: The GCP project ID.
+    :type project_id:  ``str``
+
+    :return: Tuple with changed status and response dict
+    :rtype: ``tuple`` in the format of (bool, dict)
+    """
+    try:
+        req = client.targetHttpsProxies().delete(
+            project=project_id, targetHttpsProxy=name)
+        return_data = GCPUtils.execute_api_client_req(req, client)
+        return (True, return_data)
+    except:
+        raise
 
 def update_target_http_proxy(client, target_proxy, params, name, project_id):
     """
@@ -301,9 +334,14 @@ def main():
 
     changed = False
     json_output = {'state': params['state']}
-    target_proxy = get_target_https_proxy(client,
-                                         name=params['target_proxy_name'],
-                                         project_id=conn_params['project_id'])
+    if params['target_proxy_type'] == 'HTTP':
+        target_proxy = get_target_http_proxy(client,
+                                             name=params['target_proxy_name'],
+                                             project_id=conn_params['project_id'])
+    elif params['target_proxy_type'] == 'HTTPS':
+        target_proxy = get_target_https_proxy(client,
+                                             name=params['target_proxy_name'],
+                                             project_id=conn_params['project_id'])
 
     if not target_proxy:
         if params['state'] == 'absent':
@@ -324,9 +362,15 @@ def main():
                                                                                 project_id=conn_params['project_id'])
     elif params['state'] == 'absent':
         # Delete
-        changed, json_output['target_proxy'] = delete_target_http_proxy(client,
-                                                                        name=params['target_proxy_name'],
-                                                                        project_id=conn_params['project_id'])
+        if params['target_proxy_type'] == 'HTTP':
+            changed, json_output['target_proxy'] = delete_target_http_proxy(client,
+                                                                            name=params['target_proxy_name'],
+                                                                            project_id=conn_params['project_id'])
+        elif params['target_proxy_type'] == 'HTTPS':
+            changed, json_output['target_proxy'] = delete_target_https_proxy(client,
+                                                                            name=params['target_proxy_name'],
+                                                                            project_id=conn_params['project_id'])
+
     else:
         changed, json_output['target_proxy'] = update_target_http_proxy(client,
                                                                         target_proxy=target_proxy,
