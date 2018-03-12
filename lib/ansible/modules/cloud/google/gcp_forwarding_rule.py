@@ -146,8 +146,12 @@ def _build_global_forwarding_rule_dict(params, project_id=None):
         url = GCPUtils.build_googleapi_url(project_id)
     gcp_dict = GCPUtils.params_to_gcp_dict(params, 'forwarding_rule_name')
     if 'target' in gcp_dict:
-        gcp_dict['target'] = '%s/global/targetHttpProxies/%s' % (url,
-                                                                 gcp_dict['target'])
+        if params['port_range'] == '443':
+            gcp_dict['target'] = '%s/global/targetHttpsProxies/%s' % (url,
+                                                                     gcp_dict['target'])
+        else:
+            gcp_dict['target'] = '%s/global/targetHttpProxies/%s' % (url,
+                                                                     gcp_dict['target'])
     if 'address' in gcp_dict:
         gcp_dict['IPAddress'] = '%s/global/addresses/%s' % (url,
                                                             gcp_dict['address'])

@@ -137,6 +137,25 @@ def get_target_http_proxy(client, name, project_id=None):
                                          targetHttpProxy=name)
     return GCPUtils.execute_api_client_req(req, raise_404=False)
 
+def get_target_https_proxy(client, name, project_id=None):
+    """
+    Get a Target HTTP Proxy from GCP.
+
+    :param client: An initialized GCE Compute Disovery resource.
+    :type client:  :class: `googleapiclient.discovery.Resource`
+
+    :param name: Name of the Target Proxy.
+    :type name:  ``str``
+
+    :param project_id: The GCP project ID.
+    :type project_id:  ``str``
+
+    :return: A dict resp from the respective GCP 'get' request.
+    :rtype: ``dict``
+    """
+    req = client.targetHttpsProxies().get(project=project_id,
+                                         targetHttpsProxy=name)
+    return GCPUtils.execute_api_client_req(req, raise_404=False)
 
 def create_target_http_proxy(client, params, project_id):
     """
@@ -164,6 +183,31 @@ def create_target_http_proxy(client, params, project_id):
     except:
         raise
 
+def create_target_https_proxy(client, params, project_id):
+    """
+    Create a new Target_Proxy.
+
+    :param client: An initialized GCE Compute Disovery resource.
+    :type client:  :class: `googleapiclient.discovery.Resource`
+
+    :param params: Dictionary of arguments from AnsibleModule.
+    :type params:  ``dict``
+
+    :return: Tuple with changed status and response dict
+    :rtype: ``tuple`` in the format of (bool, dict)
+    """
+    gcp_dict = _build_target_proxy_dict(params, project_id)
+    try:
+        req = client.targetHttpsProxies().insert(project=project_id,
+                                                body=gcp_dict)
+        return_data = GCPUtils.execute_api_client_req(req, client, raw=False)
+        if not return_data:
+            return_data = get_target_https_proxy(client,
+                                                name=params['target_proxy_name'],
+                                                project_id=project_id)
+        return (True, return_data)
+    except:
+        raise
 
 def delete_target_http_proxy(client, name, project_id):
     """
@@ -232,10 +276,12 @@ def update_target_http_proxy(client, target_proxy, params, name, project_id):
 
 
 def main():
+
     module = AnsibleModule(argument_spec=dict(
         target_proxy_name=dict(required=True),
-        target_proxy_type=dict(required=True, choices=['HTTP']),
+        target_proxy_type=dict(required=True, choices=['HTTP', 'HTTPS']),
         url_map_name=dict(required=False),
+        ssl_certificates=dict(type='list', required=False),
         state=dict(required=True, choices=['absent', 'present']),
         service_account_email=dict(),
         service_account_permissions=dict(type='list'),
@@ -251,10 +297,11 @@ def main():
     params['target_proxy_name'] = module.params.get('target_proxy_name')
     params['target_proxy_type'] = module.params.get('target_proxy_type')
     params['url_map'] = module.params.get('url_map_name', None)
+    params['ssl_certificates'] = module.params.get('ssl_certificates')
 
     changed = False
     json_output = {'state': params['state']}
-    target_proxy = get_target_http_proxy(client,
+    target_proxy = get_target_https_proxy(client,
                                          name=params['target_proxy_name'],
                                          project_id=conn_params['project_id'])
 
@@ -267,9 +314,14 @@ def main():
                 (params['target_proxy_name']))
         else:
             # Create
-            changed, json_output['target_proxy'] = create_target_http_proxy(client,
-                                                                            params=params,
-                                                                            project_id=conn_params['project_id'])
+            if params['target_proxy_type'] == 'HTTP':
+                changed, json_output['target_proxy'] = create_target_http_proxy(client,
+                                                                                params=params,
+                                                                                project_id=conn_params['project_id'])
+            elif params['target_proxy_type'] == 'HTTPS':
+                changed, json_output['target_proxy'] = create_target_https_proxy(client,
+                                                                                params=params,
+                                                                                project_id=conn_params['project_id'])
     elif params['state'] == 'absent':
         # Delete
         changed, json_output['target_proxy'] = delete_target_http_proxy(client,
