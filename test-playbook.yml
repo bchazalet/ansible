@@ -1,0 +1,83 @@
+- name: TEST ANSIBLE DEV
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    - bes: ansible-test-bes
+    - http_port_name: http
+    - urlmap: ansible-test-urlmap
+    - targethttpproxy: ansible-test-targethttpproxy
+    - bes_healthcheck: angelia-prod
+    - external_address_name: ansible-test-address
+    - gfr: ansible-test-gfr
+
+  tasks:
+    - name: Create Backend Service
+      gcp_backend_service:
+        backend_service_name: "{{ bes }}"
+        backends:
+          - instance_group:  angelia-prod-1
+        port_name: "{{ http_port_name }}"
+        healthchecks:
+          - "{{ bes_healthcheck }}"
+        protocol: HTTP
+        timeout: 60
+        state: "present"
+      register: result
+    - name: "assert backend service present"
+      assert:
+        that:
+          - 'result.state == "present"'
+
+    - name: Create URLMap
+      gcp_url_map:
+        url_map_name: "{{ urlmap }}"
+        default_service: "{{ bes }}"
+        state: "present"
+      register: result
+    - name: "assert urlmap present"
+      assert:
+        that:
+          - 'result.state == "present"'
+
+    # - pause: seconds=10
+
+    - name: Create TargetHTTPSProxy
+      gcp_target_proxy:
+        target_proxy_name: "{{ targethttpproxy }}"
+        url_map_name: "{{ urlmap }}"
+        target_proxy_type: HTTPS
+        ssl_certificates: star-cowatch
+        # ssl_certificates: projects/construction-178915/global/sslCertificates/star-cowatch
+        state: "present"
+      register: result
+    - name: "assert targethttpproxy present"
+      assert:
+        that:
+          - 'result.state == "present"'
+
+    - name: Create Static Address
+      gce_eip:
+        name: "{{ external_address_name }}"
+        region: global
+        state: "present"
+      register: result
+    - name: "assert static address present"
+      assert:
+        that:
+          - 'result.state == "present"'
+
+    - name: Create Global Forwarding Rule
+      gcp_forwarding_rule:
+        forwarding_rule_name: "{{ gfr }}"
+        target: "{{ targethttpproxy }}"
+        address: "{{ external_address_name }}"
+        port_range: 443
+        region: global
+        state: "present"
+      register: result
+    - name: "assert gfr present"
+      assert:
+        that:
+          - 'result.state == "present"'

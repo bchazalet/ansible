@@ -1,0 +1,6 @@
+# Project-Name Description Initial_state
+# (no spaces in names!)
+cowatch-177510 SharedVPC off
+construction-178915 Playground off
+test-datastore-196210 Testing  off
+
